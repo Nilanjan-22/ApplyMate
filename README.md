@@ -34,32 +34,54 @@ No SaaS subscriptions. No paid APIs. Just a webhook, an LLM, and some clean auto
 | **Email Engine** | Gmail API (OAuth2) — HTML emails + tracking pixel |
 | **Data Store** | Google Sheets — zero-infra relational store for applications & resume cache |
 | **File Storage** | Google Drive — resume hosting + attachment retrieval |
-| **Frontend** | Vanilla HTML / CSS / JS — no build step, no framework overhead |
+| **Frontend** | Vanilla HTML / CSS / JS — modern glassmorphism design, zero build step |
 | **Structured Output** | LangChain Output Parser (via n8n) — enforces strict JSON schemas on every LLM call |
 
 ---
 
 ## 🏗️ Architecture
 
-```
-┌─────────────┐      single webhook       ┌──────────────────────────┐
-│  Frontend   │ ─────────────────────────▶│   n8n Workflow Engine    │
-│ (HTML/JS)   │   action-based routing    │                          │
-└─────────────┘                            │  ┌────────────────────┐│
-                                            │  │ upload_resume       ││──▶ Drive + AI Parse ──▶ Sheets
-                                            │  │ extract (JD)        ││──▶ Groq Agent ──▶ JSON fields
-                                            │  │ generate_preview    ││──▶ Groq Agent ──▶ Email draft
-                                            │  │ confirm_send        ││──▶ Gmail + Attach + Log
-                                            │  │ get_history         ││──▶ Sheets read
-                                            │  └────────────────────┘│
-                                            └──────────────────────────┘
-                                                        │
-                                            ┌───────────▼────────────┐
-                                            │  Follow-up Checker      │
-                                            │  (daily cron, 9 AM)     │
-                                            │  reply-check → AI       │
-                                            │  followup → status sync │
-                                            └─────────────────────────┘
+```mermaid
+flowchart TD
+    %% Define Styles
+    classDef frontend fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef webhook fill:#334155,stroke:#94a3b8,stroke-dasharray: 5 5,color:#f8fafc;
+    classDef n8n fill:#FF6D5A,stroke:#c2410c,stroke-width:2px,color:#fff;
+    classDef external fill:#0f172a,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+
+    %% Nodes
+    UI[🖥️ Frontend UI]:::frontend
+    Hook((Webhook\nRouter)):::webhook
+    
+    subgraph n8n_Engine [n8n Workflow Engine]
+        Parse[📄 upload_resume]:::n8n
+        Extract[🔍 extract JD]:::n8n
+        Draft[✍️ generate_preview]:::n8n
+        Send[📨 confirm_send]:::n8n
+        History[📊 get_history]:::n8n
+    end
+    
+    subgraph Services [External Services]
+        Drive[(Google Drive)]:::external
+        Sheets[(Google Sheets)]:::external
+        Groq[🤖 Groq AI]:::external
+        Gmail[📧 Gmail API]:::external
+    end
+    
+    %% Connections
+    UI -- "action" --> Hook
+    Hook --> Parse & Extract & Draft & Send & History
+    
+    Parse -.-> Drive & Groq -.-> Sheets
+    Extract -.-> Groq
+    Draft -.-> Groq
+    Send -.-> Gmail & Sheets
+    History -.-> Sheets
+    
+    %% Scheduled Automations
+    Cron((Daily Cron\n9 AM)):::webhook
+    Cron --> Followup[⏰ Follow-up Checker]:::n8n
+    Followup -.-> Sheets & Groq & Gmail
 ```
 
 ---
@@ -75,16 +97,23 @@ No SaaS subscriptions. No paid APIs. Just a webhook, an LLM, and some clean auto
 - 📬 **Open tracking** — invisible pixel reports when HR opens your email
 - ⏰ **Autonomous follow-ups** — if no reply in 7 days, an AI-written nudge goes out automatically
 - 💸 **$0 to run** — Groq's free tier + Google Workspace APIs + n8n's free executions
+- 🎨 **Modern Design** — Dark mode glassmorphism UI built natively with CSS.
 
 ---
 
 ## 🚀 Getting Started
 
-1. **Import the workflows** into n8n (`ApplyMate` + `Follow-up Checker`)
+1. **Import the workflows** into n8n (`ApplyMate final.json` + `Follow-up-Checker_final.json`)
 2. **Connect credentials**: Google Sheets, Google Drive, Gmail OAuth2, Groq API key
 3. **Set up your sheet** with `Applications` and `CurrentResume` tabs
-4. **Drop `config.js`** with your webhook URL into the frontend
-5. **Open `index.html`** → upload resume → start applying
+4. **Drop `config.js`** with your webhook URL into the frontend:
+   ```javascript
+   const CONFIG = {
+       APPLY_WEBHOOK: "YOUR_N8N_WEBHOOK_URL_HERE"
+   };
+   ```
+5. **Open `index.html`** in any modern web browser.
+6. Upload your resume and start applying automatically!
 
 > Full setup walkthrough lives in the workflow files' node comments — each branch is self-documenting via its action name.
 
@@ -92,13 +121,13 @@ No SaaS subscriptions. No paid APIs. Just a webhook, an LLM, and some clean auto
 
 ## 📂 Project Structure
 
-```
+```text
 ApplyMate/
-├── index.html              # Main UI — resume upload, JD input, preview, history
-├── script.js                # Frontend logic — fetch calls to n8n webhook
-├── style.css                 # Dark-mode UI styling
-├── config.js                 # Webhook URL config
-├── ApplyMate final.json       # n8n workflow — core automation engine
+├── index.html                    # Main UI — resume upload, JD input, preview, history
+├── script.js                     # Frontend logic — fetch calls to n8n webhook
+├── style.css                     # Modern Glassmorphism UI styling
+├── config.js                     # Webhook URL config
+├── ApplyMate final.json          # n8n workflow — core automation engine
 └── Follow-up-Checker_final.json  # n8n workflow — scheduled follow-up logic
 ```
 
